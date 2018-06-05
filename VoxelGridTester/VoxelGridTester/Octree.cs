@@ -3,6 +3,7 @@
 /// Mark Scherer, June 2018
 
 /// NOTE: Untested. Ready for testing (6/4/2018).
+/// Must update navigate function to properly use references.
 
 using System;
 using UnityEngine;
@@ -60,7 +61,7 @@ public class Octree<T>
         }
         else
         {
-            Tuple<Voxel<T>, ref OctreeContainer<T>, int> leaf = navigate(point);
+            var leaf = navigate(point);
             Voxel<T> vox = leaf.Item1;
             if (vox.point == null || vox.size() <= minSize)
                 vox.update(point);
@@ -84,7 +85,7 @@ public class Octree<T>
     {
         if (!root.contains(point))
             resize(point);
-        Tuple<Voxel<T>, ref OctreeContainer<T>, int> leaf = navigate(point);
+        var leaf = navigate(point);
         Voxel<T> vox = leaf.Item1;
         vox.setPoint(point);
         vox.setValue(value);
@@ -98,18 +99,17 @@ public class Octree<T>
     {
         if (!root.contains(point))
             throw new ArgumentOutOfRangeException("point", "point not contained in Octree");
-        Tuple<Voxel<T>, ref OctreeContainer<T>, int> leaf = navigate(point);
+        var leaf = navigate(point);
         Voxel<T> vox = leaf.Item1;
         return vox.value;
     }
 
     /// <summary>
     /// Returns total bounds of Octree.
-    /// Return: Tuple of min, max.
     /// <summary>
-    public Tuple<Vector3, Vector3> bounds()
+    public (Vector3 min, Vector3 max) bounds()
     {
-        return Tuple.Create<Vector3, Vector3>(root.min, root.max);
+        return (root.min, root.max);
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public class Octree<T>
         {
             /// find growth direction
             int childNum = optimalChildNum(root, point);
-            Tuple<Vector3, Vector3> newRootBounds = root.parentBounds(childNum);
+            var newRootBounds = root.parentBounds(childNum);
             OctreeContainer<T> newRoot = new OctreeContainer<T>(newRootBounds.Item1, newRootBounds.Item2);
             newRoot.setChild(childNum, root);
             root = newRoot;
@@ -136,12 +136,12 @@ public class Octree<T>
     /// Parent by reference to allow manipulation.
     /// Return: Voxel (leaf), OctreeContainer (direct-parent), childNumber.
     /// <summary>
-    private Tuple<Voxel<T>, ref OctreeContainer<T>, int> navigate(Vector3 point)
+    private (Voxel<T>, ref OctreeContainer<T>, int) navigate(Vector3 point)
     {
         if (!root.contains(point))
             throw new ArgumentOutOfRangeException("point", "not currently contained in Octree");
         if (root.GetType() == typeof(Voxel<T>))
-            return Tuple.Create<Voxel<T>, OctreeContainer<T>, int>(root, null, -1);
+            return ((Voxel<T>)root, null, -1);
         else
             return root.navigate(point);
     }
@@ -235,10 +235,9 @@ public abstract class OctreeComponent<T>
 
     /// <summary>
     /// Returns hypothetical parent component's bounds IF this component was the given child number.
-    /// Returns Tuple of min, max bounds.
     /// Used for creating parent when growing Octree.
     /// <summary>
-    public Tuple<Vector3, Vector3> parentBounds(int childNum)
+    public (Vector3 min, Vector3 max) parentBounds(int childNum)
     {
         float childSize = size();
         Vector3 parentMin = new Vector3();
@@ -276,10 +275,10 @@ public abstract class OctreeComponent<T>
             parentMin.z = min.z + childSize;
             parentMax.z = max.z;
         }
-        return Tuple.Create<Vector3, Vector3>(parentMin, parentMax);
+        return (parentMin, parentMax);
     }
 
-    public abstract Tuple<Voxel<T>, ref OctreeContainer<T>, int> navigate(Vector3 point);
+    public abstract (Voxel<T>, ref OctreeContainer<T>, int) navigate(Vector3 point);
 }
 
 
@@ -302,7 +301,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     {
         for (int i = 0; i < 8; i++)
         {
-            Tuple<Vector3, Vector3> voxBounds = childBounds(i);
+            var voxBounds = childBounds(i);
             children[i] = new Voxel<T>(voxBounds.Item1, voxBounds.Item2);
         }
     }
@@ -335,26 +334,27 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// Parent by reference to allow manipulation.
     /// Return: Voxel (leaf), OctreeContainer (direct-parent), childNumber.
     /// <summary>
-    public override Tuple<Voxel<T>, OctreeContainer<T>, int> navigate(Vector3 point)
+    public override (Voxel<T>, ref OctreeContainer<T>, int) navigate(Vector3 point)
     {
         if (!contains(point))
             throw new ArgumentOutOfRangeException("point", "not contained in OctreeContainer.");
         for (int i = 0; i < 8; i++)
         {
             if (children[i].contains(point))
+            {
                 if (children[i].GetType() == typeof(Voxel<T>))
-                    return Tuple.Create<Voxel<T>, OctreeContainer<T>>(children[i], ref this, i);
+                    return ((Voxel<T>)children[i], this, i);
                 else
                     return children[i].navigate(point);
+            }
         }
-        return Tuple.Create<Voxel<T>, OctreeContainer<T>, int>(null, null, -1); // should never be called.
+        return (null, null, -1); // should never be called.
     }
 
     /// <summary>
     /// Returns specified child component's bounds.
-    /// Returns Tuple of min, max bounds.
     /// <summary>
-    public Tuple<Vector3, Vector3> childBounds(int childNum)
+    public (Vector3, Vector3) childBounds(int childNum)
     {
         float childSize = size() / 2.0f;
         Vector3 childMin = new Vector3();
@@ -392,7 +392,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
             childMin.z = min.z + childSize;
             childMax.z = max.z;
         }
-        return new Tuple<Vector3, Vector3>(childMin, childMax);
+        return (childMin, childMax);
     }
 }
 
@@ -458,7 +458,7 @@ public class Voxel<T> : OctreeComponent<T>
         OctreeComponent<T>[] newChildren = new OctreeComponent<T>[8];
         for (int i = 0; i < 8; i++)
         {
-            Tuple<Vector3, Vector3> voxBounds = replacement.childBounds(i);
+            var voxBounds = replacement.childBounds(i);
             Voxel<T> newChild = new Voxel<T>(voxBounds.Item1, voxBounds.Item2);
             if (newChild.contains(point))
             {
@@ -474,7 +474,7 @@ public class Voxel<T> : OctreeComponent<T>
         return replacement;
     }
 
-    public override Tuple<Voxel<T>, OctreeContainer<T>, int> navigate(Vector3 point)
+    public override (Voxel<T>, ref OctreeContainer<T>, int) navigate(Vector3 point)
     {
         throw new NotImplementedException();
     }
