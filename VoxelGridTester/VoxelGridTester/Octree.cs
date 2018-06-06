@@ -3,24 +3,21 @@
 /// Mark Scherer, June 2018
 
 /// NOTE 1: Due to inexperience with C# and its limitations:
-    /// 1. Possessive, not linked tree structure. Because C# doesn't allow pointer to user defined classes or
+    /// 1. Possessive, not linked tree structure. Because C# doesn't allow pointer to user-defined classes or
         /// reference reassignment, nodes 'own' subtree beneath them, not just are linked.
         /// Consequences:
             /// a) Recursive operation structure: operations must be pushed thru root and performed at node of
                 /// interest instead of centrally with link to node of interest.
             /// b): Copy-operate-swap not unlink-operate-relink. Any changes require replacing entire subtree.
     /// 2. Private variables, public mutators: where C++ would use friend classes/methods, must use completely public
-        /// variable or mutator. Current structure provides marginal better saftey than pure public variable.
-    /// 3. Central parameters recorded in each node: To avoid global variables, minSize, etc. is recorded in each leaf
-        /// instead of once in Octree. In C++, would give nodes pointer to Octree instance they are apart of and record
-        /// once centrally. Might use global variables and make Octree singleton.
+        /// variable or mutator. Current structure provides marginally better saftey than pure public variable.
+    /// 3. Central parameters recorded in each node: To avoid global variables, minSize is recorded in each Component
+        /// instead of once in Octree. 
 
 /// NOTE 2: Octree metadata does not currently work.
 
 /// NOTE 3: Untested (6/6/2018)
 
-/// Think about: combining set and update to one, with bool control to decide if update functionality should
-    /// be run. Would allow each vertex to navigate tree once, not twice. 
 
 using System;
 using UnityEngine;
@@ -34,7 +31,7 @@ public class Octree<T>
     /// <summary>
     /// Pointer to root Octree component.
     /// <summary>
-    private OctreeComponent<T> root;
+    private OctreeContainer<T> root;
 
     /// <summary>
     /// Component size controls.
@@ -57,13 +54,14 @@ public class Octree<T>
         minSize = myMinSize;
         defaultSize = myDefaultSize;
 
-        float buffer = defaultSize / 2.0f;
-        Vector3 min = new Vector3(point.x - buffer, point.y - buffer, point.z - buffer);
-        Vector3 max = new Vector3(point.x + buffer, point.y + buffer, point.z + buffer);
-        Voxel<T> root = new Voxel<T>(min, max, minSize, point);
+        float buffer1 = 0.25f * defaultSize;
+        float buffer2 = defaultSize - buffer1;
+        Vector3 min = new Vector3(point.x - buffer1, point.y - buffer1, point.z - buffer1);
+        Vector3 max = new Vector3(point.x + buffer2, point.y + buffer2, point.z + buffer2);
+        root = new OctreeContainer<T>(min, max, myMinSize);
 
-        numComponents = 1;
-        numVoxels = 1;
+        numComponents = 9;
+        numVoxels = 8;
     }
 
     /// <summary>
@@ -77,32 +75,15 @@ public class Octree<T>
 
     /// <summary>
     /// Sets value at Voxel containing point.
-    /// If root does not contain point, Octree resized so it does.
+    /// If updateStruct, re-grids contained space so no voxel contains two points.
+    /// If not, replaces value in vox.
+    /// If Octree does not contain point, will grow until it does.
     /// <summary>
-    public void set(Vector3 point, T value)
-    {
-        while (!root.contains(point))
-            grow(point);
-        root.set(point, value);
-    }
-
-    /// <summary>
-    /// Updates grid structure given new point to be included.
-    /// <summary>
-    public void resize(Vector3 point)
+    public void set(Vector3 point, T value, bool updateStruct)
     {
         if (!root.contains(point))
-        {
-            /// grow tree
             grow(point);
-            resize(point);
-        } else
-        {
-            if (root.GetType() == typeof(OctreeContainer<T>))
-                ((OctreeContainer<T>)root).updateContainer(point);
-            if (root.GetType() == typeof(Voxel<T>))
-                root = ((Voxel<T>)root).updateVoxel(point);
-        }
+        root.set(point, value, updateStruct);
     }
 
     /// <summary>
@@ -115,19 +96,19 @@ public class Octree<T>
 
     /// <summary>
     /// Grows Octree so current root is made child of new, larger root.
-    /// Grows in direction of passed point.
+    /// Grows in direction of passed point, until point is within root.
     /// <summary>
     private void grow(Vector3 point)
     {
         while (!root.contains(point))
         {
-            /// find growth direction
-            int childNum = optimalChildNum(root, point);
+            int childNum = optimalChildNum(root, point); /// find growth direction
             var newRootBounds = root.parentBounds(childNum);
             OctreeContainer<T> newRoot = new OctreeContainer<T>(newRootBounds.Item1, newRootBounds.Item2, minSize);
             newRoot.setChild(childNum, root);
             root = newRoot;
             numComponents += 8;
+            numVoxels += 7;
         }
     }
 
@@ -190,23 +171,25 @@ public abstract class OctreeComponent<T>
     public Vector3 max { get; private set; }
 
     /// <summary>
+    /// Minimum allowed size of a voxel.
+    /// Stored in each Component to prevent need for global variable.
+    /// <summary>
+    public float minSize { get; private set; }
+
+    /// <summary>
     /// Constructor.
     /// <summary>
-    public OctreeComponent(Vector3 myMin, Vector3 myMax)
+    public OctreeComponent(Vector3 myMin, Vector3 myMax, float myMinSize)
     {
         min = myMin;
         max = myMax;
+        minSize = myMinSize;
     }
 
     /// <summary>
     /// Gets value at Voxel containing point.
     /// <summary>
     public abstract T get(Vector3 pointToGet);
-
-    /// <summary>
-    /// Sets value at Voxel containing point.
-    /// <summary>
-    public abstract void set(Vector3 newPoint, T newValue);
 
     /// <summary>
     /// Accessor for Component's size.
@@ -230,7 +213,7 @@ public abstract class OctreeComponent<T>
 
     /// <summary>
     /// Returns hypothetical parent component's bounds IF this component was the given child number.
-    /// Used for creating parent when growing Octree.
+    /// Used for creating parent in Octree grow.
     /// <summary>
     public (Vector3 min, Vector3 max) parentBounds(int childNum)
     {
@@ -289,13 +272,13 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// Constructor.
     /// Sets all Container children to new Voxels.
     /// <summary>
-    public OctreeContainer(Vector3 myMin, Vector3 myMax, float voxelMinSize)
-        : base(myMin, myMax)
+    public OctreeContainer(Vector3 myMin, Vector3 myMax, float myMinSize)
+        : base(myMin, myMax, myMinSize)
     {
         for (int i = 0; i < 8; i++)
         {
             var voxBounds = childBounds(i);
-            children[i] = new Voxel<T>(voxBounds.Item1, voxBounds.Item2, voxelMinSize);
+            children[i] = new Voxel<T>(voxBounds.Item1, voxBounds.Item2, myMinSize);
         }
     }
 
@@ -312,36 +295,31 @@ public class OctreeContainer<T> : OctreeComponent<T>
     }
 
     /// <summary>
-    /// Sets value at Voxel containing newPoint.
+    /// Sets value at Voxel containing point.
+    /// If updateStruct, re-grids contained space so no voxel contains two points.
+    /// If not, replaces value in vox.
     /// If Container does not contain newPoint, throws ArgumentOutOfRangeException.
     /// <summary>
-    public override void set(Vector3 newPoint, T newValue)
+    public void set(Vector3 point, T value, bool updateStruct)
     {
-        if (!contains(newPoint))
-            throw new ArgumentOutOfRangeException("newPoint", "not contained in Container.");
-        int childNum = whichChild(newPoint);
-        children[childNum].set(newPoint, newValue);
-    }
-
-    /// <summary>
-    /// Updates octree grid structure to handle newPoint
-    /// If Container does not contain newPoint, throws ArgumentOutOfRangeException.
-    /// Created separate updateContainer (no return) and updateVoxel (OctreeComponent return) instead of
-        /// abstract update (OctreeComponent return) to avoid unecessary copy-replace at higher tree levels.
-    /// <summary>
-    public void updateContainer(Vector3 newPoint)
-    {
-        if (!contains(newPoint))
-            throw new ArgumentOutOfRangeException("newPoint", "not contained in Container.");
-        int childNum = whichChild(newPoint);
+        if (!contains(point))
+            throw new ArgumentOutOfRangeException("point", "not contained in Container.");
+        int childNum = whichChild(point);
         if (children[childNum].GetType() == typeof(OctreeContainer<T>))
+            ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
+        else
         {
-            /// navigate down again
-            ((OctreeContainer<T>)children[childNum]).updateContainer(newPoint);
-        } else
-        {
-            /// reached voxel
-            children[childNum] = ((Voxel<T>)children[childNum]).updateVoxel(newPoint);
+            if (!updateStruct || ((Voxel<T>)children[childNum]).point == null ||
+                children[childNum].size() < 2f * minSize)
+            {
+                /// reassign voxel data
+                ((Voxel<T>)children[childNum]).set(point, value);
+            } else
+            {
+                /// split, try set again
+                children[childNum] = ((Voxel<T>)children[childNum]).split();
+                ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
+            }
         }
     }
 
@@ -359,7 +337,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// <summary>
     /// Returns hypothetical child component's bounds.
     /// Note: works if actual child is assigned to null, i.e. used in constructor.
-    /// Used by Voxel when splitting.
+    /// Used publicly by Voxel when splitting.
     /// <summary>
     public (Vector3, Vector3) childBounds(int childNum)
     {
@@ -405,7 +383,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// <summary>
     /// Returns child number containiner point.
     /// Note: if container does not contain point, throws ArgumentOutOfRangeException.
-    /// Used by Voxel when splitting.
+    /// Used publicly by Voxel when splitting.
     /// <summary>
     public int whichChild(Vector3 point)
     {
@@ -437,18 +415,11 @@ public class Voxel<T> : OctreeComponent<T>
     public Vector3 point { get; private set; }
 
     /// <summary>
-    /// Minimum allowed size of a voxel.
-    /// Stored in each voxel to prevent need for global variable.
-    /// <summary>
-    public float minSize { get; private set; }
-
-    /// <summary>
     /// Constructor.
     /// <summary>
     public Voxel(Vector3 myMin, Vector3 myMax, float myMinSize, 
-        Vector3 myPoint = new Vector3(), T myValue = default(T)) : base(myMin, myMax)
+        Vector3 myPoint = new Vector3(), T myValue = default(T)) : base(myMin, myMax, myMinSize)
     {
-        minSize = myMinSize;
         point = myPoint;
         value = myValue;
     }
@@ -465,10 +436,13 @@ public class Voxel<T> : OctreeComponent<T>
     }
 
     /// <summary>
-    /// Sets value at Voxel containing point.
+    /// Mutator for Voxel data.
     /// If Voxel does not contain point, throws ArgumentOutOfRangeException.
+    /// Used by OctreeContainer set.
+    /// NOTE: Private variable/public mutator is more safe than pure public variable.
+        /// Really wish C# allowed friend classes.
     /// <summary>
-    public override void set(Vector3 newPoint, T newValue)
+    public void set(Vector3 newPoint, T newValue)
     {
         if (!contains(newPoint))
             throw new ArgumentOutOfRangeException("newPoint", "not contained in Voxel.");
@@ -477,41 +451,16 @@ public class Voxel<T> : OctreeComponent<T>
     }
 
     /// <summary>
-    /// Sets, resets or splits voxel to handle newPoint as appropriate.
-    /// Returns updated copy of self.
-    /// Created separate updateContainer (no return) and updateVoxel (OctreeComponent return) instead of
-        /// abstract update (OctreeComponent return) to avoid unecessary copy-replace at higher tree levels.
+    /// Splits Voxel into 8 smaller Voxels, returns new Octree Container.
     /// <summary>
-    public OctreeComponent<T> updateVoxel(Vector3 newPoint)
-    {
-        if (point == null || size() < minSize / 2.0f || point == newPoint)
-        {
-            /// voxel vacant or too small to split, or direct repeat. Reset to new point.
-            return new Voxel<T>(min, max, minSize, newPoint);
-        } else
-        {
-            /// split Voxel
-            return split(newPoint);
-        }
-    }
-
-    /// <summary>
-    /// Splits Voxel into 8 smaller Voxels, converts to Octree Container.
-    /// Recursive, terminates when current point and newPoint are in difference voxels or minSize reached.
-    /// <summary>
-    private OctreeContainer<T> split(Vector3 newPoint)
+    public OctreeContainer<T> split()
     {
         OctreeContainer<T> replacement = new OctreeContainer<T>(min, max, minSize);
 
         /// add original point to new OctreeContainer
-        int childNumOrigPoint = replacement.whichChild(point);
-        var voxBounds = replacement.childBounds(childNumOrigPoint);
-        replacement.setChild(childNumOrigPoint, new Voxel<T>(voxBounds.Item1, voxBounds.Item2, minSize, point));
-
-        /// add newPoint in new OctreeContainer
-        int childNumNewPoint = replacement.whichChild(newPoint);
-        OctreeComponent<T> updatedVox = ((Voxel<T>)replacement.children[childNumNewPoint]).updateVoxel(newPoint);
-        replacement.setChild(childNumNewPoint, updatedVox);
+        int childNum = replacement.whichChild(point);
+        var voxBounds = replacement.childBounds(childNum);
+        replacement.setChild(childNum, new Voxel<T>(voxBounds.Item1, voxBounds.Item2, minSize, point, value));
 
         return replacement;
     }
