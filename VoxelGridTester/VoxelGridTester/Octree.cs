@@ -1,20 +1,27 @@
 ﻿/// Octree
 /// Data structure for sparse, bounded 3D data.
 /// Mark Scherer, June 2018
+/// Contents:
+    /// MetadataChange (struct)
+    /// Octree<T> (class)
+    /// OctreeComponent<T> (class)
+    /// OctreeContainer<T> : OctreeComponent<T> (class)
+    /// Voxel<T> : OctreeComponent<T> (class)
+
 
 /// NOTE 1: Due to inexperience with C# and its limitations:
     /// a) Possessive, not linked tree structure. Because C# doesn't allow pointer to user-defined classes or
-        /// reference reassignment, nodes 'own' subtree beneath them, not just are linked.
-        /// Consequences:
+        /// reference reassignment, nodes 'own' subtree beneath them, not just are linked. Consequences:
             /// i) Recursive operation structure: operations must be pushed thru root and performed at node of
                 /// interest instead of centrally with link to node of interest.
-            /// ii): Copy-operate-swap not unlink-operate-relink. Any changes require replacing entire subtree.
+            /// ii): Copy-operate-swap not unlink-operate-relink. Any changes require replacing entire involved subtree. 
+                /// Relevant for grow operation.
     /// b) Private variables, public mutators: where C++ would use friend classes/methods, must use completely public
         /// variable or mutator. Current structure provides marginally better saftey than pure public variable.
     /// c) Central parameters recorded in each node: To avoid global variables, minSize is recorded in each Component
         /// instead of once in Octree.
 
-/// NOTE 3: Untested (6/6/2018)
+/// NOTE 2: Tested via VoxelGridTester/Program.cs/TestOctree() (6/7/2018)
 
 
 using System;
@@ -23,12 +30,12 @@ using UnityEngine;
 /// <summary>
 /// Used to return metadata changes from Component classes up to Octree class when conducting Octree operations.
 /// <summary>
-public struct metadataChange
+public struct MetadataChange
 {
     public int components, voxels, nonNullVoxels;
     public double volume, nonNullVolume;
 
-    public metadataChange(int dComponents=0, int dVoxels=0, int dNonNullVoxels=0,
+    public MetadataChange(int dComponents=0, int dVoxels=0, int dNonNullVoxels=0,
         double dVolume=0, double dNonNullVolume=0)
     {
         components = dComponents;
@@ -38,9 +45,9 @@ public struct metadataChange
         nonNullVolume = dNonNullVolume;
     }
 
-    public static metadataChange operator +(metadataChange lhs, metadataChange rhs)
+    public static MetadataChange operator +(MetadataChange lhs, MetadataChange rhs)
     {
-        return new metadataChange(lhs.components + rhs.components, lhs.voxels + rhs.voxels,
+        return new MetadataChange(lhs.components + rhs.components, lhs.voxels + rhs.voxels,
             lhs.nonNullVoxels + rhs.nonNullVoxels, lhs.volume + rhs.volume, lhs.nonNullVolume + rhs.nonNullVolume);
     }
 }
@@ -54,7 +61,7 @@ public class Octree<T>
     /// <summary>
     /// Pointer to root Octree component.
     /// <summary>
-    private OctreeContainer<T> root;
+    public OctreeContainer<T> root { get; private set; }
 
     /// <summary>
     /// Component size controls.
@@ -80,7 +87,7 @@ public class Octree<T>
         minSize = myMinSize;
         defaultSize = myDefaultSize;
 
-        float buffer1 = 0.25f * defaultSize;
+        float buffer1 = 0.2f * defaultSize;
         float buffer2 = defaultSize - buffer1;
         Vector3 min = new Vector3(point.x - buffer1, point.y - buffer1, point.z - buffer1);
         Vector3 max = new Vector3(point.x + buffer2, point.y + buffer2, point.z + buffer2);
@@ -112,7 +119,7 @@ public class Octree<T>
     {
         if (!root.contains(point))
             grow(point);
-        metadataChange change = root.set(point, value, updateStruct);
+        MetadataChange change = root.set(point, value, updateStruct);
         updateMetadata(change);
     }
 
@@ -192,7 +199,7 @@ public class Octree<T>
     /// <summary>
     /// updates metadata given MetadataChange from Component classes.
     /// <summary>
-    private void updateMetadata(metadataChange change)
+    private void updateMetadata(MetadataChange change)
     {
         numComponents += change.components;
         numVoxels += change.voxels;
@@ -248,15 +255,16 @@ public abstract class OctreeComponent<T>
     { return Math.Pow(size(), 3f); }
 
     /// <summary>
-    /// Checks if point is contained (exclusively) within Component bounds
+    /// Checks if point is contained within Component bounds.
+    /// Note: inclusive on min side, exclusive on max side.
     /// <summary>
     public bool contains(Vector3 point)
     {
-        if (point.x <= min.x || point.x >= max.x)
+        if (point.x < min.x || point.x >= max.x)
             return false;
-        if (point.y <= min.y || point.y >= max.y)
+        if (point.y < min.y || point.y >= max.y)
             return false;
-        if (point.z <= min.z || point.z >= max.z)
+        if (point.z < min.z || point.z >= max.z)
             return false;
         return true;
     }
@@ -274,33 +282,33 @@ public abstract class OctreeComponent<T>
         if (childNum == 0 || childNum == 2 || childNum == 4 || childNum == 6)
         {
             parentMin.x = min.x;
-            parentMax.x = min.x + childSize;
+            parentMax.x = min.x + 2.0f * childSize;
         }
         else
         {
-            parentMin.x = min.x + childSize;
+            parentMin.x = max.x - 2.0f * childSize;
             parentMax.x = max.x;
         }
         /// find y
         if (childNum == 2 || childNum == 3 || childNum == 6 || childNum == 7)
         {
             parentMin.y = min.y;
-            parentMax.y = min.y + childSize;
+            parentMax.y = min.y + 2.0f * childSize;
         }
         else
         {
-            parentMin.y = min.y + childSize;
+            parentMin.y = max.y - 2.0f * childSize;
             parentMax.y = max.y;
         }
         /// find z
         if (childNum == 4 || childNum == 5 || childNum == 6 || childNum == 7)
         {
             parentMin.z = min.z;
-            parentMax.z = min.z + childSize;
+            parentMax.z = min.z + 2.0f * childSize;
         }
         else
         {
-            parentMin.z = min.z + childSize;
+            parentMin.z = max.z - 2.0f * childSize;
             parentMax.z = max.z;
         }
         return (parentMin, parentMax);
@@ -325,6 +333,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     public OctreeContainer(Vector3 myMin, Vector3 myMax, float myMinSize)
         : base(myMin, myMax, myMinSize)
     {
+        children = new OctreeComponent<T>[8];
         for (int i = 0; i < 8; i++)
         {
             var voxBounds = childBounds(i);
@@ -349,9 +358,9 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// If updateStruct, re-grids contained space so no voxel contains two points.
     /// If not, replaces value in vox.
     /// If Container does not contain newPoint, throws ArgumentOutOfRangeException.
-    /// Returns metadataChange object specifying changes made.
+    /// Returns MetadataChange object specifying changes made.
     /// <summary>
-    public metadataChange set(Vector3 point, T value, bool updateStruct)
+    public MetadataChange set(Vector3 point, T value, bool updateStruct)
     {
         if (!contains(point))
             throw new ArgumentOutOfRangeException("point", "not contained in Container.");
@@ -360,7 +369,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
             return ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
         else
         {
-            if (!updateStruct || ((Voxel<T>)children[childNum]).point == null ||
+            if (!updateStruct || ((Voxel<T>)children[childNum]).nullVox == true ||
                 children[childNum].size() < 2f * minSize)
             {
                 /// reassign voxel data
@@ -370,8 +379,8 @@ public class OctreeContainer<T> : OctreeComponent<T>
                 /// split, try set again
                 var splitResult = ((Voxel<T>)children[childNum]).split();
                 children[childNum] = splitResult.Item1;
-                metadataChange change1 = splitResult.Item2;
-                metadataChange change2 = ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
+                MetadataChange change1 = splitResult.Item2;
+                MetadataChange change2 = ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
                 return change1 + change2;
             }
         }
@@ -448,7 +457,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
             if (children[i].contains(point))
                 return i;
         }
-        return -1; // should not ever be called.
+        throw new ArgumentOutOfRangeException("point", "not contained in any of Container's children.");
     }
 }
 
@@ -458,6 +467,13 @@ public class OctreeContainer<T> : OctreeComponent<T>
 /// <summary>
 public class Voxel<T> : OctreeComponent<T>
 {
+    /// <summary>
+    /// Indicates if Voxel is null value.
+    /// Because value is generic type (T) and point is a non-nullable type (Vector3), impossible to
+        /// indicate null-value Voxel without flag.
+    /// <summary>
+    public bool nullVox { get; private set; }
+
     /// <summary>
     /// Value stored in Octree.
     /// <summary>
@@ -469,11 +485,22 @@ public class Voxel<T> : OctreeComponent<T>
     public Vector3 point { get; private set; }
 
     /// <summary>
-    /// Constructor.
+    /// Constructor 1: creates null Voxel.
     /// <summary>
-    public Voxel(Vector3 myMin, Vector3 myMax, float myMinSize, 
-        Vector3 myPoint = new Vector3(), T myValue = default(T)) : base(myMin, myMax, myMinSize)
+    public Voxel(Vector3 myMin, Vector3 myMax, float myMinSize) : base(myMin, myMax, myMinSize)
     {
+        nullVox = true;
+        point = default(Vector3);
+        value = default(T);
+    }
+
+    /// <summary>
+    /// Constructor 1: creates Voxel with value.
+    /// <summary>
+    public Voxel(Vector3 myMin, Vector3 myMax, float myMinSize, Vector3 myPoint, T myValue)
+        : base(myMin, myMax, myMinSize)
+    {
+        nullVox = false;
         point = myPoint;
         value = myValue;
     }
@@ -496,22 +523,23 @@ public class Voxel<T> : OctreeComponent<T>
     /// NOTE: Private variable/public mutator is more safe than pure public variable.
         /// Really wish C# allowed friend classes.
     /// <summary>
-    public metadataChange set(Vector3 newPoint, T newValue)
+    public MetadataChange set(Vector3 newPoint, T newValue)
     {
         if (!contains(newPoint))
             throw new ArgumentOutOfRangeException("newPoint", "not contained in Voxel.");
-        T oldValue = value;
+        bool wasNull = nullVox;
+        nullVox = false;
         point = newPoint;
         value = newValue;
-        if (oldValue == null)
-            return new metadataChange(dNonNullVoxels: 1, dNonNullVolume: volume());
-        return new metadataChange();
+        if (wasNull)
+            return new MetadataChange(dNonNullVoxels: 1, dNonNullVolume: volume());
+        return new MetadataChange();
     }
 
     /// <summary>
     /// Splits Voxel into 8 smaller Voxels, returns new Octree Container.
     /// <summary>
-    public (OctreeContainer<T>, metadataChange) split()
+    public (OctreeContainer<T>, MetadataChange) split()
     {
         OctreeContainer<T> replacement = new OctreeContainer<T>(min, max, minSize);
 
@@ -521,6 +549,6 @@ public class Voxel<T> : OctreeComponent<T>
         replacement.setChild(childNum, new Voxel<T>(voxBounds.Item1, voxBounds.Item2, minSize, point, value));
 
         return (replacement,
-            new metadataChange(dComponents:8, dVoxels:7, dNonNullVolume:-0.875 * replacement.volume()));
+            new MetadataChange(dComponents:8, dVoxels:7, dNonNullVolume:-0.875 * replacement.volume()));
     }
 }
