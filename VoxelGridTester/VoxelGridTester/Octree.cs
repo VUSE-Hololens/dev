@@ -28,6 +28,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -129,9 +130,12 @@ public class Octree<T>
     /// <summary>
     /// Returns total bounds of Octree.
     /// <summary>
-    public (Vector3 min, Vector3 max) bounds()
+    public Dictionary<string, Vector3> bounds()
     {
-        return (root.min, root.max);
+        Dictionary<string, Vector3> tmp = new Dictionary<string, Vector3>();
+        tmp.Add("min", root.min);
+        tmp.Add("max", root.max);
+        return tmp;
     }
 
     /// <summary>
@@ -144,7 +148,7 @@ public class Octree<T>
         {
             int childNum = optimalChildNum(root, point); /// find growth direction
             var newRootBounds = root.parentBounds(childNum);
-            OctreeContainer<T> newRoot = new OctreeContainer<T>(newRootBounds.Item1, newRootBounds.Item2, minSize);
+            OctreeContainer<T> newRoot = new OctreeContainer<T>(newRootBounds["min"], newRootBounds["max"], minSize);
             newRoot.setChild(childNum, root);
             root = newRoot;
             
@@ -276,7 +280,7 @@ public abstract class OctreeComponent<T>
     /// Returns hypothetical parent component's bounds IF this component was the given child number.
     /// Used for creating parent in Octree grow.
     /// <summary>
-    public (Vector3 min, Vector3 max) parentBounds(int childNum)
+    public Dictionary<string, Vector3> parentBounds(int childNum)
     {
         float childSize = size();
         Vector3 parentMin = new Vector3();
@@ -314,7 +318,10 @@ public abstract class OctreeComponent<T>
             parentMin.z = max.z - 2.0f * childSize;
             parentMax.z = max.z;
         }
-        return (parentMin, parentMax);
+        Dictionary<string, Vector3> tmp = new Dictionary<string, Vector3>();
+        tmp.Add("min", parentMin);
+        tmp.Add("max", parentMax);
+        return tmp;
     }
 }
 
@@ -340,7 +347,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
         for (int i = 0; i < 8; i++)
         {
             var voxBounds = childBounds(i);
-            children[i] = new Voxel<T>(voxBounds.Item1, voxBounds.Item2, myMinSize);
+            children[i] = new Voxel<T>(voxBounds["min"], voxBounds["max"], myMinSize);
         }
     }
 
@@ -380,9 +387,8 @@ public class OctreeContainer<T> : OctreeComponent<T>
             } else
             {
                 /// split, try set again
-                var splitResult = ((Voxel<T>)children[childNum]).split();
-                children[childNum] = splitResult.Item1;
-                MetadataChange change1 = splitResult.Item2;
+                MetadataChange change1;
+                children[childNum] = ((Voxel<T>)children[childNum]).split(out change1);
                 MetadataChange change2 = ((OctreeContainer<T>)children[childNum]).set(point, value, updateStruct);
                 return change1 + change2;
             }
@@ -405,7 +411,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// Note: works if actual child is assigned to null, i.e. used in constructor.
     /// Used publicly by Voxel when splitting.
     /// <summary>
-    public (Vector3, Vector3) childBounds(int childNum)
+    public Dictionary<string, Vector3> childBounds(int childNum)
     {
         float childSize = size() / 2.0f;
         Vector3 childMin = new Vector3();
@@ -443,7 +449,10 @@ public class OctreeContainer<T> : OctreeComponent<T>
             childMin.z = min.z + childSize;
             childMax.z = max.z;
         }
-        return (childMin, childMax);
+        Dictionary<string, Vector3> tmp = new Dictionary<string, Vector3>();
+        tmp.Add("min", childMin);
+        tmp.Add("max", childMax);
+        return tmp;
     }
 
     /// <summary>
@@ -542,16 +551,16 @@ public class Voxel<T> : OctreeComponent<T>
     /// <summary>
     /// Splits Voxel into 8 smaller Voxels, returns new Octree Container.
     /// <summary>
-    public (OctreeContainer<T>, MetadataChange) split()
+    public OctreeContainer<T> split(out MetadataChange change)
     {
         OctreeContainer<T> replacement = new OctreeContainer<T>(min, max, minSize);
 
         /// add original point to new OctreeContainer
         int childNum = replacement.whichChild(point);
         var voxBounds = replacement.childBounds(childNum);
-        replacement.setChild(childNum, new Voxel<T>(voxBounds.Item1, voxBounds.Item2, minSize, point, value));
+        replacement.setChild(childNum, new Voxel<T>(voxBounds["min"], voxBounds["max"], minSize, point, value));
 
-        return (replacement,
-            new MetadataChange(dComponents:8, dVoxels:7, dNonNullVolume:-0.875 * replacement.volume()));
+        change = new MetadataChange(dComponents: 8, dVoxels: 7, dNonNullVolume: -0.875 * replacement.volume());
+        return replacement;
     }
 }

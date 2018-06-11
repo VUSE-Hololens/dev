@@ -9,34 +9,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Used for packaging voxGrid metadata because Unity does not allow Tuples
-/// </summary>
-public struct Metadata
-{
-    public int components, voxels, nonNullVoxels;
-    public double volume, nonNullVolume;
-    public Vector3 min, max;
-    public DateTime lastUpdated;
-
-    public Metadata(int myComponents, int myVoxels, int myNonNullVoxels, double myVolume, double myNonNullVolume,
-        Vector3 myMin, Vector3 myMax, DateTime myLastUpdated)
-    {
-        components = myComponents;
-        voxels = myVoxels;
-        nonNullVoxels = myNonNullVoxels;
-        volume = myVolume;
-        nonNullVolume = myNonNullVolume;
-        min = myMin;
-        max = myMax;
-        lastUpdated = myLastUpdated;
-    }
-}
-
-/// <summary>
 /// Interface for voxelated data structure. Currently setup to store byte data.
 /// NOTE: Because singleton, voxGrid constructor values must be set with static control variables within this class.
 /// </summary>
-[RequireComponent(typeof(Singleton<VoxelGridManager>))]
 public class VoxelGridManager : Singleton<VoxelGridManager>
 {
     /// <summary>
@@ -82,11 +57,20 @@ public class VoxelGridManager : Singleton<VoxelGridManager>
     /// <summary>
     /// Accessor for voxGrid metadata.
     /// </summary>
-    public Metadata about()
+    public (int components, int voxels, int nonNullVoxels, double volume, double nonNullVolume,
+        Vector3 min, Vector3 max, DateTime lastUpdated) about()
     {
-        Metadata info = new Metadata(voxGrid.numComponents, voxGrid.numVoxels, voxGrid.numNonNullVoxels,
-            voxGrid.volume, voxGrid.nonNullVolume, voxGrid.root.min, voxGrid.root.max, lastUpdate);
-        return info;
+        (int components, int voxels, int nonNullVoxels, double volume, double nonNullVolume,
+            Vector3 min, Vector3 max, DateTime lastUpdated) metadata;
+        metadata.components = voxGrid.numComponents;
+        metadata.voxels = voxGrid.numVoxels;
+        metadata.nonNullVoxels = voxGrid.numNonNullVoxels;
+        metadata.volume = voxGrid.volume;
+        metadata.nonNullVolume = voxGrid.nonNullVolume;
+        metadata.min = voxGrid.root.min;
+        metadata.max = voxGrid.root.max;
+        metadata.lastUpdated = lastUpdate;
+        return metadata;
     }
 
     /// <summary>
@@ -95,10 +79,10 @@ public class VoxelGridManager : Singleton<VoxelGridManager>
     /// <param name="updates">
     /// List of tuples of points, values to set.
     /// </param>
-    public void set(List<Vector3> points, List<byte> values)
+    public void set(List<(Vector3 point, byte value)> updates)
     {
-        for (int i = 0; i < points.Count; i++)
-            voxGrid.set(points[i], values[i], updateStruct);
+        for (int i = 0; i < updates.Count; i++)
+            voxGrid.set(updates[i].point, updates[i].value, updateStruct);
         lastUpdate = DateTime.Now;
     }
 }

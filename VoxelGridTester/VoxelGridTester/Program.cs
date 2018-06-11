@@ -13,7 +13,7 @@ class Program
         Console.WriteLine("DevTester... SensorIntergrator Project.");
 
         // Test Octree
-        //TestOctree();
+        TestOctree();
 
         // Test VoxelGridManager
         TestVoxelGridManager();
@@ -190,9 +190,11 @@ class Program
         {
             Vector3 point = randomPoint(boundsMin, boundsMax, rand);
             byte value = (byte)rand.Next(0, 255);
-            List<(Vector3, byte)> updates = new List<(Vector3, byte)>();
-            updates.Add((point, value));
-            VoxelGridManager.Instance.set(updates);
+            List<Vector3> points = new List<Vector3>();
+            List<byte> values = new List<byte>();
+            points.Add(point);
+            values.Add(value);
+            VoxelGridManager.Instance.set(points, values);
         }
         stopWatch.Stop();
         long millisecs = stopWatch.ElapsedMilliseconds;
@@ -214,9 +216,11 @@ class Program
         {
             Vector3 point = randomPoint(boundsMin, boundsMax, rand);
             byte value = (byte)rand.Next(0, 255);
-            List<(Vector3, byte)> updates = new List<(Vector3, byte)>();
-            updates.Add((point, value));
-            VoxelGridManager.Instance.set(updates);
+            List<Vector3> points = new List<Vector3>();
+            List<byte> values = new List<byte>();
+            points.Add(point);
+            values.Add(value);
+            VoxelGridManager.Instance.set(points, values);
         }
         stopWatch.Stop();
         millisecs = stopWatch.ElapsedMilliseconds;
@@ -235,14 +239,13 @@ class Program
     }
 
     // Return VoxelGridManager's about return in presentable format
-    static string about((int components, int voxels, int nonNullVoxels, double volume, double nonNullVolume,
-        Vector3 min, Vector3 max, DateTime lastUpdated) aboutInfo)
+    static string about(Metadata info)
     {
         return String.Format("VoxelGridManager about: Components: {0}, Voxels: {1} ({2} non-null), " +
             "Volume: {3} ({4} non-null), Bounds: ({5} to {6}), Last Updated: {7}", 
-            aboutInfo.components, aboutInfo.voxels, aboutInfo.nonNullVoxels, 
-            Math.Round(aboutInfo.volume, 2), Math.Round(aboutInfo.nonNullVolume, 2), 
-            pointToStr(aboutInfo.min), pointToStr(aboutInfo.max), aboutInfo.lastUpdated.ToString("hh:mm:ss.fff tt"));
+            info.components, info.voxels, info.nonNullVoxels, 
+            Math.Round(info.volume, 2), Math.Round(info.nonNullVolume, 2), 
+            pointToStr(info.min), pointToStr(info.max), info.lastUpdated.ToString("hh:mm:ss.fff tt"));
     }
 
     // Returns point coordinates in presentable format.
