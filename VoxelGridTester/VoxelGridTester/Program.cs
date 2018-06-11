@@ -1,5 +1,9 @@
-﻿using System;
+﻿/// Test file for Octree, VoxelGridManager
+/// Mark Scherer, June 2018 
+
+using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using UnityEngine;
 
 class Program
@@ -9,7 +13,10 @@ class Program
         Console.WriteLine("DevTester... SensorIntergrator Project.");
 
         // Test Octree
-        TestOctree();
+        //TestOctree();
+
+        // Test VoxelGridManager
+        TestVoxelGridManager();
 
         // Keep the console window open in debug mode.
         Console.WriteLine("Press any key to exit.");
@@ -31,6 +38,8 @@ class Program
     // Note: Deep navigation: 2+ containers before Voxel; Shallow navigation: <= 1 container before Voxel. 
     static void TestOctree()
     {
+        Console.WriteLine("Testing Octree...\n");
+        
         // Test 1: Constructor
         Vector3 startPoint = new Vector3(0.2f, 0.2f, 0.2f);
         float minSize = 0.2f; // m
@@ -149,12 +158,91 @@ class Program
         Console.WriteLine(metadata<int>(octree3) + "\n");
     }
 
+    // Test VoxelGridManager
+    // Tests...
+        // Instance (T1)
+        // About (T1)
+        // Set (structUpdate: true) (T2)
+        // Set (structUpdate: false) (T3)
+    static void TestVoxelGridManager()
+    {
+        Console.WriteLine("\nTesting VoxelGridManager...\n");
+
+        // Test 1: Constructor, About
+        Console.WriteLine("Test 1: Creating VoxelGridManager...");
+        VoxelGridManager manager = VoxelGridManager.Instance;
+        Console.WriteLine(about(manager.about()));
+        Console.WriteLine("Re-accessing VoxleGridManager Instance...");
+        Console.WriteLine(about(manager.about()));
+        Console.WriteLine();
+
+        // Test 2: Set (structUpdate: true)
+        Vector3 boundsMin = new Vector3(0, 0, 0);
+        Vector3 boundsMax = new Vector3(5, 5, 5);
+        int iterations = 1000;
+        Console.WriteLine("Test 2: set... conducting {0} iterations of random points " + "between {1} and {2}... " +
+            "structUpdate: {3}", iterations, pointToStr(boundsMin), pointToStr(boundsMax), 
+            VoxelGridManager.Instance.updateStruct);
+        System.Random rand = new System.Random();
+        Stopwatch stopWatch = new Stopwatch();
+        stopWatch.Start();
+        for (int i = 0; i < iterations; i++)
+        {
+            Vector3 point = randomPoint(boundsMin, boundsMax, rand);
+            byte value = (byte)rand.Next(0, 255);
+            List<(Vector3, byte)> updates = new List<(Vector3, byte)>();
+            updates.Add((point, value));
+            VoxelGridManager.Instance.set(updates);
+        }
+        stopWatch.Stop();
+        long millisecs = stopWatch.ElapsedMilliseconds;
+        float perOp = 1000f * millisecs / (2.0f * iterations);
+        Console.WriteLine("Avg time per op (us): {0}", perOp);
+        Console.WriteLine("Elasped time (ms): {0}", millisecs);
+        Console.WriteLine(about(manager.about()) + "\n");
+
+        // Test 3: Set (structUpdate: false)
+        VoxelGridManager.Instance.updateStruct = false;
+        boundsMin = new Vector3(0, 0, 0);
+        boundsMax = new Vector3(5, 5, 5);
+        iterations = 1000;
+        Console.WriteLine("Test 2: set... conducting {0} iterations of random points " + "between {1} and {2}... " +
+            "structUpdate: {3}", iterations, pointToStr(boundsMin), pointToStr(boundsMax),
+            VoxelGridManager.Instance.updateStruct);
+        stopWatch.Start();
+        for (int i = 0; i < iterations; i++)
+        {
+            Vector3 point = randomPoint(boundsMin, boundsMax, rand);
+            byte value = (byte)rand.Next(0, 255);
+            List<(Vector3, byte)> updates = new List<(Vector3, byte)>();
+            updates.Add((point, value));
+            VoxelGridManager.Instance.set(updates);
+        }
+        stopWatch.Stop();
+        millisecs = stopWatch.ElapsedMilliseconds;
+        perOp = 1000f * millisecs / (2.0f * iterations);
+        Console.WriteLine("Avg time per op (us): {0}", perOp);
+        Console.WriteLine("Elasped time (ms): {0}", millisecs);
+        Console.WriteLine(about(manager.about()) + "\n");
+    }
+
     // Returns octree metadata in presentable format.
     static string metadata<T>(Octree<T> octree)
     {
         return String.Format("Octree metadata: Components: {0}, Voxels: {1} ({2} non-null), " +
             "Volume: {3} ({4} non-null)", octree.numComponents, octree.numVoxels, octree.numNonNullVoxels, 
             Math.Round(octree.volume, 2), Math.Round(octree.nonNullVolume, 2));
+    }
+
+    // Return VoxelGridManager's about return in presentable format
+    static string about((int components, int voxels, int nonNullVoxels, double volume, double nonNullVolume,
+        Vector3 min, Vector3 max, DateTime lastUpdated) aboutInfo)
+    {
+        return String.Format("VoxelGridManager about: Components: {0}, Voxels: {1} ({2} non-null), " +
+            "Volume: {3} ({4} non-null), Bounds: ({5} to {6}), Last Updated: {7}", 
+            aboutInfo.components, aboutInfo.voxels, aboutInfo.nonNullVoxels, 
+            Math.Round(aboutInfo.volume, 2), Math.Round(aboutInfo.nonNullVolume, 2), 
+            pointToStr(aboutInfo.min), pointToStr(aboutInfo.max), aboutInfo.lastUpdated.ToString("hh:mm:ss.fff tt"));
     }
 
     // Returns point coordinates in presentable format.

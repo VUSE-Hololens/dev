@@ -22,6 +22,9 @@
         /// instead of once in Octree.
 
 /// NOTE 2: Tested via VoxelGridTester/Program.cs/TestOctree() (6/7/2018)
+ 
+/// NOTE 3: Consider adding functionality for 'batched' sets/gets. If series of sets/gets are made on same voxel,
+    /// can do navigation just once.
 
 
 using System;
