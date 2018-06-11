@@ -1,4 +1,4 @@
-﻿/// Test file for Octree, VoxelGridManager
+﻿/// Test file for Octree, VoxelGridManager, Singleton
 /// Mark Scherer, June 2018 
 
 using System;
