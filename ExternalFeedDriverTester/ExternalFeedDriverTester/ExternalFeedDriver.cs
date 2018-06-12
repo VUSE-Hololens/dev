@@ -3,6 +3,7 @@
 /// Mark Scherer, June 2018
 
 using System;
+using System.Linq;
 using System.Diagnostics;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,7 +18,7 @@ public class ExternalFeedDriver : MonoBehaviour
     /// <summary>
     /// Tracks speed of execution of pathway.
     /// </summary>
-    public double frequency { get; private set; }
+    public double speed { get; private set; }
 
     /// <summary>
     /// Central control for VoxelGridManager.
@@ -26,8 +27,6 @@ public class ExternalFeedDriver : MonoBehaviour
 
     private Stopwatch stopWatch = new Stopwatch();
 
-    System.Random rand = new System.Random();
-
     /// <summary>
     /// Called once at startup.
     /// </summary>
@@ -35,26 +34,26 @@ public class ExternalFeedDriver : MonoBehaviour
     {
         VoxelGridManager.Instance.updateStruct = updateVoxelStructure;
     }
-    
+
     /// <summary>
     /// Called once per frame.
     /// </summary>
     void Update()
     {
+        stopWatch.Reset();
         stopWatch.Start();
-        List<(Vector3, byte)> updates = new List<(Vector3, byte)>();
 
         /// get mesh vertex list from MeshManager
         List<Vector3> vertices = MeshManager.Instance.getVertices();
 
-        foreach (Vector3 point in vertices)
-            updates.Add((point, (byte)rand.Next(0, 255)));
+        // create list of update values
+        byte defaultValue = 0;
+        List<byte> updateValues = Enumerable.Repeat(defaultValue, vertices.Count).ToList();
 
-        /// add all vertices to voxel grid with VoxelGridManager
-        VoxelGridManager.Instance.set(updates);
+        // push updates to VoxelGridManager
+        VoxelGridManager.Instance.set(vertices, updateValues);
 
         stopWatch.Stop();
-        double millisecs = stopWatch.ElapsedMilliseconds;
-        frequency = 1000.0 / millisecs;
+        speed = (double)Stopwatch.Frequency / (double)stopWatch.ElapsedTicks;
     }
 }

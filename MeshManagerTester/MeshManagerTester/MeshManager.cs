@@ -10,19 +10,25 @@ using UnityEngine;
 /// Accessor class to Hololens spatial mapping data via HoloToolKit/SpatialMapping/SpatialMappingManager.
 /// </summary>
 [RequireComponent(typeof(HoloToolkit.Unity.SpatialMapping.SpatialMappingManager))]
-[RequireComponent(typeof(Singleton))]
-public class MeshManager : Singleton<MeshManager>
+public class MeshManager : HoloToolkit.Unity.Singleton<MeshManager>
 {
     /// <summary>
-    /// Metadata: number of vertices returned by getVertices.
-    /// Note: As discussed in getVertices, are repeat vertices included in count.
+    /// Metadata: number of independent meshes returned by SpatialMappingManager.
+    /// NOTE: only updated when getVertices() is called.
     /// </summary>
-    public int vertexCount { get; private set; } = 0;
+    public int meshCount { get; private set; }
 
     /// <summary>
-    /// Metadata: number of independent meshes returned by SpatialMappingManager.
+    /// Metadata: number of triangles in all meshes returned by SpatialMappingManager.
+    /// NOTE: only updated when getVertices() is called.
     /// </summary>
-    public int meshCount { get; private set; } = 0;
+    public int triangleCount { get; private set; }
+
+    /// <summary>
+    /// Metadata: number of vertices in all meshes returned by SpatialMappingManager.
+    /// NOTE: only updated when getVertices() is called.
+    /// </summary>
+    public int vertexCount { get; private set; }
 
     /// <summary>
     /// Constructor. ONLY to be used within Singleton, elsewhere ALWAYS use Instance().
@@ -30,7 +36,8 @@ public class MeshManager : Singleton<MeshManager>
     /// </summary>
     public MeshManager()
     {
-        // nothing to do
+        vertexCount = 0;
+        meshCount = 0;
     }
 
     /// <summary>
@@ -40,11 +47,15 @@ public class MeshManager : Singleton<MeshManager>
     public List<Vector3> getVertices()
     {
         List<Vector3> vertices = new List<Vector3>();
-        List<Mesh> meshes = 
+        List<Mesh> allMeshes =
             HoloToolkit.Unity.SpatialMapping.SpatialMappingManager.Instance.GetMeshes();
-        foreach (Mesh mesh in meshes)
+        triangleCount = 0;
+        foreach (Mesh mesh in allMeshes)
+        {
             vertices.AddRange(mesh.vertices);
-        meshCount = meshes.Count;
+            triangleCount += mesh.triangles.Length;
+        }
+        meshCount = allMeshes.Count;
         vertexCount = vertices.Count;
         return vertices;
     }

@@ -2,29 +2,29 @@
 /// Data structure for sparse, bounded 3D data.
 /// Mark Scherer, June 2018
 /// Contents:
-    /// MetadataChange (struct)
-    /// Octree<T> (class)
-    /// OctreeComponent<T> (class)
-    /// OctreeContainer<T> : OctreeComponent<T> (class)
-    /// Voxel<T> : OctreeComponent<T> (class)
+/// MetadataChange (struct)
+/// Octree<T> (class)
+/// OctreeComponent<T> (class)
+/// OctreeContainer<T> : OctreeComponent<T> (class)
+/// Voxel<T> : OctreeComponent<T> (class)
 
 
 /// NOTE 1: Due to inexperience with C# and its limitations:
-    /// a) Possessive, not linked tree structure. Because C# doesn't allow pointer to user-defined classes or
-        /// reference reassignment, nodes 'own' subtree beneath them, not just are linked. Consequences:
-            /// i) Recursive operation structure: operations must be pushed thru root and performed at node of
-                /// interest instead of centrally with link to node of interest.
-            /// ii): Copy-operate-swap not unlink-operate-relink. Any changes require replacing entire involved subtree. 
-                /// Relevant for grow operation.
-    /// b) Private variables, public mutators: where C++ would use friend classes/methods, must use completely public
-        /// variable or mutator. Current structure provides marginally better saftey than pure public variable.
-    /// c) Central parameters recorded in each node: To avoid global variables, minSize is recorded in each Component
-        /// instead of once in Octree.
+/// a) Possessive, not linked tree structure. Because C# doesn't allow pointer to user-defined classes or
+/// reference reassignment, nodes 'own' subtree beneath them, not just are linked. Consequences:
+/// i) Recursive operation structure: operations must be pushed thru root and performed at node of
+/// interest instead of centrally with link to node of interest.
+/// ii): Copy-operate-swap not unlink-operate-relink. Any changes require replacing entire involved subtree. 
+/// Relevant for grow operation.
+/// b) Private variables, public mutators: where C++ would use friend classes/methods, must use completely public
+/// variable or mutator. Current structure provides marginally better saftey than pure public variable.
+/// c) Central parameters recorded in each node: To avoid global variables, minSize is recorded in each Component
+/// instead of once in Octree.
 
 /// NOTE 2: Tested via VoxelGridTester/Program.cs/TestOctree() (6/7/2018)
- 
+
 /// NOTE 3: Consider adding functionality for 'batched' sets/gets. If series of sets/gets are made on same voxel,
-    /// can do navigation just once.
+/// can do navigation just once.
 
 
 using System;
@@ -39,8 +39,8 @@ public struct MetadataChange
     public int components, voxels, nonNullVoxels;
     public double volume, nonNullVolume;
 
-    public MetadataChange(int dComponents=0, int dVoxels=0, int dNonNullVoxels=0,
-        double dVolume=0, double dNonNullVolume=0)
+    public MetadataChange(int dComponents = 0, int dVoxels = 0, int dNonNullVoxels = 0,
+        double dVolume = 0, double dNonNullVolume = 0)
     {
         components = dComponents;
         voxels = dVoxels;
@@ -82,6 +82,7 @@ public class Octree<T>
     public int numNonNullVoxels { get; private set; }
     public double volume { get; private set; }
     public double nonNullVolume { get; private set; }
+    public int memSize { get; private set; } // memory burden in bytes
 
     /// <summary>
     /// Constructor. Creates null-value Voxel of defaultSize around point as root of Octree.
@@ -151,7 +152,7 @@ public class Octree<T>
             OctreeContainer<T> newRoot = new OctreeContainer<T>(newRootBounds["min"], newRootBounds["max"], minSize);
             newRoot.setChild(childNum, root);
             root = newRoot;
-            
+
             numComponents += 8;
             numVoxels += 7;
             volume = root.volume();
@@ -213,6 +214,7 @@ public class Octree<T>
         numNonNullVoxels += change.nonNullVoxels;
         volume += change.volume;
         nonNullVolume += change.nonNullVolume;
+        memSize = ((numComponents - numVoxels) * OctreeContainer<T>.memSize) + (numVoxels * Voxel<T>.memSize);
     }
 }
 
@@ -337,6 +339,12 @@ public class OctreeContainer<T> : OctreeComponent<T>
     public OctreeComponent<T>[] children { get; private set; }
 
     /// <summary>
+    /// Memory burden of a single OctreeContainer.
+    /// Containers do not add any memory burden as they only own their children.
+    /// </summary>
+    public static readonly int memSize = 0;
+
+    /// <summary>
     /// Constructor.
     /// Sets all Container children to new Voxels.
     /// <summary>
@@ -384,7 +392,8 @@ public class OctreeContainer<T> : OctreeComponent<T>
             {
                 /// reassign voxel data
                 return ((Voxel<T>)children[childNum]).set(point, value);
-            } else
+            }
+            else
             {
                 /// split, try set again
                 MetadataChange change1;
@@ -399,7 +408,7 @@ public class OctreeContainer<T> : OctreeComponent<T>
     /// Mutator for a child.
     /// Used by Octree in grow, Voxel in split.
     /// NOTE: Private variable/public mutator is more safe than pure public variable.
-        /// Really wish C# allowed friend classes.
+    /// Really wish C# allowed friend classes.
     /// <summary>
     public void setChild(int childNum, OctreeComponent<T> newChild)
     {
@@ -480,9 +489,15 @@ public class OctreeContainer<T> : OctreeComponent<T>
 public class Voxel<T> : OctreeComponent<T>
 {
     /// <summary>
+    /// Memory burden of a single Voxel.
+    /// NOTE: ASSUMES T IS ONE BYTE ! Also assumes bool is one bit.
+    /// </summary>
+    public static readonly int memSize = 6;
+
+    /// <summary>
     /// Indicates if Voxel is null value.
     /// Because value is generic type (T) and point is a non-nullable type (Vector3), impossible to
-        /// indicate null-value Voxel without flag.
+    /// indicate null-value Voxel without flag.
     /// <summary>
     public bool nullVox { get; private set; }
 
@@ -533,7 +548,7 @@ public class Voxel<T> : OctreeComponent<T>
     /// If Voxel does not contain point, throws ArgumentOutOfRangeException.
     /// Used by OctreeContainer set.
     /// NOTE: Private variable/public mutator is more safe than pure public variable.
-        /// Really wish C# allowed friend classes.
+    /// Really wish C# allowed friend classes.
     /// <summary>
     public MetadataChange set(Vector3 newPoint, T newValue)
     {
