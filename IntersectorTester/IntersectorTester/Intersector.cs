@@ -1,10 +1,10 @@
 ﻿/// Intersector
-/// Static class for calculating resultant PointValues when 2D Raster is project along a Frustum at a Mesh.
+/// Class for calculating resultant PointValues when 2D Raster is project along a Frustum at a Mesh.
 /// Content:
-    /// PointValue (struct)
-    /// ViewVector (struct)
-    /// Frustum (struct)
-    /// Intersector (class)
+/// PointValue (struct)
+/// ViewVector (struct)
+/// Frustum (struct)
+/// Intersector (class)
 
 using System;
 using System.Collections.Generic;
@@ -28,8 +28,8 @@ public struct PointValue<T>
 /// <summary>
 /// Vector for relative angle of (x,y,z) vector relative to 2D plane. Vector must originate at origin.
 /// For 2D plane = XY plane, positive Z is forwards, 2D plane coordinates i,j:
-    /// Theta (i): angle of vector with YZ plane
-    /// Phi (j): angle of vector with XZ plane
+/// Theta (i): angle of vector with YZ plane
+/// Phi (j): angle of vector with XZ plane
 /// </summary>
 public struct ViewVector
 {
@@ -48,13 +48,14 @@ public struct ViewVector
     /// </summary>
     public ViewVector(Vector3 spatialVector)
     {
-        Theta = Intersector.RadToDeg(Intersector.AdjAtanTheta(spatialVector.z, spatialVector.x));
-        Phi = Intersector.RadToDeg(Intersector.AdjAtanPhi(spatialVector.z, spatialVector.y));
+        Theta = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanTheta(spatialVector.z, spatialVector.x));
+        Phi = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanPhi(spatialVector.z, spatialVector.y));
     }
 }
 
 /// <summary>
 /// Spatially-aware view field of a sensor.
+/// FOV defines full angle of frustum field of view, centered at transform. 
 /// </summary>
 public struct Frustum
 {
@@ -73,20 +74,20 @@ public struct Frustum
 /// Mesh represented by list of vertices.
 /// NOTE: does not currently account for occlusion.
 /// </summary>
-public static class Intersector
+public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
 {
     /// <summary>
     /// Metadata: how many vertices were in passed Frustum for last call to Intersection().
     /// </summary>
-    public static int VerticesInView { get; private set; }
-    
+    public int VerticesInView { get; private set; }
+
     /// <summary>
     /// Calculates resultant PointValues when 2D Raster (img) is projected along Frustum at Mesh (vertices).
     /// Mesh represented by list of vertices.
     /// NOTE 1: does not currently account for occlusion.
     /// NOTE 2: projection's FOV should be full FOV angles, not half-angles.
     /// </summary>
-    public static List<PointValue<T>> Intersection<T>(Frustum projection, T[,] img, List<Vector3> vertices)
+    public List<PointValue<T>> Intersection<T>(Frustum projection, T[,] img, List<Vector3> vertices)
     {
         int PCi = img.GetLength(0);
         int PCj = img.GetLength(1);
@@ -105,7 +106,7 @@ public static class Intersector
             ViewVector Vlocal = new ViewVector(Plocal);
 
             /// check if view vector is within Frustum FOV
-            if (Math.Abs(Vlocal.Theta) < projection.FOV.Theta / 2.0 && 
+            if (Math.Abs(Vlocal.Theta) < projection.FOV.Theta / 2.0 &&
                 Math.Abs(Vlocal.Phi) < projection.FOV.Phi / 2.0)
             {
                 /// map view vector to position grid
@@ -124,7 +125,7 @@ public static class Intersector
     /// <summary>
     /// Returns vector FROM point1 TO point2.
     /// </summary>
-    public static Vector3 Vector(Vector3 point1, Vector3 point2)
+    public Vector3 Vector(Vector3 point1, Vector3 point2)
     {
         return point2 - point1;
     }
@@ -132,7 +133,7 @@ public static class Intersector
     /// <summary>
     /// Converts radians to degrees.
     /// </summary>
-    public static double RadToDeg(double rad)
+    public double RadToDeg(double rad)
     {
         return rad * (180.0 / Math.PI);
     }
@@ -140,7 +141,7 @@ public static class Intersector
     /// <summary>
     /// Calculates arctan (in radians) so that resultant angle is between -pi and pi.
     /// </summary>
-    public static double AdjAtanTheta(double denominator, double numerator)
+    public double AdjAtanTheta(double denominator, double numerator)
     {
         if (denominator < 0 && numerator > 0) /// Q3
             return Math.PI / 2.0 + Math.Atan(-denominator / numerator);
@@ -152,7 +153,7 @@ public static class Intersector
     /// <summary>
     /// Calculates arctan (in radians) always in reference to plane of numerator
     /// </summary>
-    public static double AdjAtanPhi(double denominator, double numerator)
+    public double AdjAtanPhi(double denominator, double numerator)
     {
         if (denominator < 0 && numerator > 0) /// Q2
             return Math.Atan(-denominator / numerator);
