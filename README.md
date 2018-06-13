@@ -9,3 +9,4 @@ Repository for content developed for VADL Hololens initative.
 * [VoxelGridManager](../master/VoxelGridTester/VoxelGridTester/VoxelGridManager.cs) and [test file](../master/VoxelGridTester/VoxelGridTester/Program.cs)
 * [MeshManager](../master/MeshManagerTester/MeshManagerTester/MeshManager.cs)
 * [ExternalFeedDriver](../master/ExternalFeedDriverTester/ExternalFeedDriverTester/ExternalFeedDriver.cs)
+* [Intersector](../master/IntersectorTester/IntersectorTester/Intersector.cs) and [test file](../master/IntersectorTester/IntersectorTester/Program.cs)
