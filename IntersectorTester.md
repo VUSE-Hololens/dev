@@ -10,7 +10,7 @@ The application runs the following tests and displays their output:
 * Test 5: large scale intersection calculation for speed estimates.
 * Test 6: calulating size of grid required for occlusion approximation.
 * Test 7: basic occlusion test with known occluded and non-occluded points.
-* Test 8: large scale occlusion for approximation accuracy tests.
+* Test 8: large scale occlusion for approximation accuracy estimates.
 
 ![picture alt](../master/imgs/IntersectorTesterScreenshot.jpg "screenshot")
 
