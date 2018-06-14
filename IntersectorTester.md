@@ -15,7 +15,7 @@ The application runs the following tests and displays their output:
 ![picture alt](../master/imgs/IntersectorTesterScreenshot.jpg "screenshot")
 
 ### Building on Local Machine
-1. Import [Unity project assets](https://github.com/VUSE-Hololens/assets/tree/master/IntersectorTester).
+1. Import [Unity project assets](https://github.com/VUSE-Hololens/assets/tree/master/IntersectorTester) and HoloToolkit package.
 2. Apply Mixed Reality Toolkit Project and Scene settings.
 3. Add following prefabs to project:
 	1. TextControlContainer
