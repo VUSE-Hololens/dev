@@ -1,11 +1,12 @@
 # dev
 Repository for content developed for VADL Hololens initative.
 
-Note: When editing source file projects, always retieve most recent version from its base source file as indicated by links below. As source files are edited, only base source file is kept up to date, not all versions within other projects.
+**Note:** When editing source file projects, always retieve most recent version from its base source file as indicated by links below. As source files are edited, only base source file is kept up to date, not all versions within other projects.
 
 ### Apps
-* [External Feed Pathway Tester v1](../master/EFPv1.md)
-* [IntersectorTester](../master/IntersectorTester.md)
+* [External Feed Pathway Tester v2](../master/EFPv2.md): EFP with simulated sensor.
+* [External Feed Pathway Tester v1](../master/EFPv1.md): EFP without sensor or intersection calculation.
+* [IntersectorTester](../master/IntersectorTester.md): Tester for intersection calculations.
 
 ### Source Files
 * [Octree](../master/VoxelGridTester/VoxelGridTester/Octree.cs), [test file](../master/VoxelGridTester/VoxelGridTester/Program.cs) and [memory calibrator](../master/OctreeMemCalibrator/OctreeMemCalibrator/Program.cs)
