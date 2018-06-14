@@ -1,4 +1,4 @@
-# External Feed Pathway Tester vv
+# External Feed Pathway Tester v2
 Tester for EVP without actual external feed. Tests SpatialMappingObserver, SpatialMappingManager, MeshManager, EFPDriver, Intersector and VoxelGridManager.
 
 ### Changes Since v1
