@@ -12,7 +12,7 @@ The following changes were made since EFP Tester v1:
 EFPDriver pulls a list of all cached spatial mapping data from SpatialMappingObserver via SpatialMappingManager then MeshManager. EFPDriver then pushes spatial mapping data to Intersector, which calculates non-occluded mesh vertices and their projected sensor value. EFPDriver then pushes non-occlused vertex-value pairs to VoxelGridManager to be set in the voxel grid. TextControl pulls and displays process metadata.
 The app renders a wireframe of visible meshes as well as a panel of process diagnostics.
 
-![picture alt](../master/imgs/EFPTesterv2screenshot.jpg "screenshot")
+![picture alt](../master/imgs/EFPTesterv2Screenshot.jpg "screenshot")
 
 ### Building on Local Machine
 1. Import [Unity project assets](https://github.com/VUSE-Hololens/assets/tree/master/EFP%20Tester%20v2).
