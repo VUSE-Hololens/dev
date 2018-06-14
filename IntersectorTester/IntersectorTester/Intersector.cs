@@ -70,6 +70,16 @@ public struct Frustum
 }
 
 /// <summary>
+/// Cell of Occlusion grid using closest-in-grid occlusion approximation strategy.
+/// </summary>
+public struct OcclusionCell<T>
+{
+    public PointValue<T> pv;
+    public float distance;
+    public bool nullCell;
+}
+
+/// <summary>
 /// Calculates resultant PointValues when 2D Raster is projected along a Frustum at a Mesh.
 /// Mesh represented by list of vertices.
 /// NOTE: does not currently account for occlusion.
@@ -82,6 +92,11 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     public int VerticesInView { get; private set; }
 
     /// <summary>
+    /// Metadata: how many vertices were in passed Frustum and non-occluded for last call to Intersection().
+    /// </summary>
+    public int nonOccludedVertices { get; private set; }
+
+    /// <summary>
     /// Calculates resultant PointValues when 2D Raster (img) is projected along Frustum at Mesh (vertices).
     /// Mesh represented by list of vertices.
     /// NOTE 1: does not currently account for occlusion.
@@ -89,11 +104,24 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     /// </summary>
     public List<PointValue<T>> Intersection<T>(Frustum projection, T[,] img, List<Vector3> vertices)
     {
-        int PCi = img.GetLength(0);
-        int PCj = img.GetLength(1);
-
+        /// setup
+        int imgPCi = img.GetLength(0);
+        int imgPCj = img.GetLength(1);
         List<PointValue<T>> result = new List<PointValue<T>>();
+        VerticesInView = 0;
 
+        /// create occlusion grid
+        Dictionary<string, int> ocPixels = RequiredGrid(projection.FOV);
+        int ocPCi = ocPixels["i"];
+        int ocPCj = ocPixels["j"];
+        OcclusionCell<T>[,] ocGrid = new OcclusionCell<T>[ocPCi, ocPCj];
+        for (int i = 0; i < ocGrid.GetLength(0); i++)
+        {
+            for (int j = 0; j < ocGrid.GetLength(1); j++)
+                ocGrid[i, j].nullCell = true;
+        }
+
+        /// try each vertex
         foreach (Vector3 vertex in vertices)
         {
             /// calculate position vector (world space)
@@ -109,16 +137,36 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
             if (Math.Abs(Vlocal.Theta) < projection.FOV.Theta / 2.0 &&
                 Math.Abs(Vlocal.Phi) < projection.FOV.Phi / 2.0)
             {
-                /// map view vector to position grid
-                int i = (int)(PCi / 2 + PCi * (Vlocal.Theta / projection.FOV.Theta));
-                int j = (int)(PCj / 2 + PCj * (Vlocal.Phi / projection.FOV.Phi));
+                VerticesInView++;
 
-                /// create new PointValue
-                result.Add(new PointValue<T>(vertex, img[i, j]));
+                /// map view vector to occlusion grid
+                int ioc = (int)(ocPCi / 2 + ocPCi * (Vlocal.Theta / projection.FOV.Theta));
+                int joc = (int)(ocPCj / 2 + ocPCj * (Vlocal.Phi / projection.FOV.Phi));
+
+                /// add to occlusion grid as new PointValue if not occluded
+                if (ocGrid[ioc, joc].nullCell || Pworld.magnitude < ocGrid[ioc, joc].distance)
+                {
+                    /// map view vector to img pixel grid
+                    int iImg = (int)(imgPCi / 2 + imgPCi * (Vlocal.Theta / projection.FOV.Theta));
+                    int jImg = (int)(imgPCj / 2 + imgPCj * (Vlocal.Phi / projection.FOV.Phi));
+
+                    /// update occlusion grid
+                    ocGrid[ioc, joc].pv = new PointValue<T>(vertex, img[iImg, jImg]);
+                    ocGrid[ioc, joc].distance = Pworld.magnitude;
+                    ocGrid[ioc, joc].nullCell = false;
+                }
             }
         }
 
-        VerticesInView = result.Count;
+        for (int i = 0; i < ocGrid.GetLength(0); i++)
+        {
+            for (int j = 0; j < ocGrid.GetLength(1); j++)
+            {
+                if (!ocGrid[i, j].nullCell)
+                    result.Add(ocGrid[i, j].pv);
+            }
+        }
+        nonOccludedVertices = result.Count;
         return result;
     }
 
@@ -138,11 +186,23 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
         return rad * (180.0 / Math.PI);
     }
 
+    public double DegToRad(double deg)
+    {
+        return deg * (Math.PI / 180.0);
+    }
+
     /// <summary>
     /// Calculates arctan (in radians) so that resultant angle is between -pi and pi.
     /// </summary>
     public double AdjAtanTheta(double denominator, double numerator)
     {
+        if (numerator == 0)
+        {
+            if (denominator > 0)
+                return 0.0;
+            else
+                return 180.0;
+        }
         if (denominator < 0 && numerator > 0) /// Q3
             return Math.PI / 2.0 + Math.Atan(-denominator / numerator);
         if (denominator < 0 && numerator < 0) /// Q4
@@ -151,14 +211,37 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     }
 
     /// <summary>
-    /// Calculates arctan (in radians) always in reference to plane of numerator
+    /// Calculates arctan (in radians) always in reference to plane of numerator.
     /// </summary>
     public double AdjAtanPhi(double denominator, double numerator)
     {
+        if (numerator == 0)
+        {
+            return 0;
+        }
         if (denominator < 0 && numerator > 0) /// Q2
             return Math.Atan(-denominator / numerator);
         if (denominator < 0 && numerator < 0) /// Q3
             return -Math.Atan(denominator / numerator);
         return Math.Atan(denominator / numerator);
+    }
+
+    /// <summary>
+    /// Determines the required grid size given hard-coded parameters for occlusion approximation via closest in grid.
+    /// </summary>
+    public Dictionary<string, int> RequiredGrid(ViewVector FOV)
+    {
+        double size = 0.10; // minimum object size to not be considered occluded (m)
+        double angle = 45.0; // maximum surface angle with line-of-sight normal to not be considered occluded (deg)
+        double distance = 3.0; // maximum object distance from sensor to not be considered occluded (m)
+
+        double apparentSize = size * Math.Cos(DegToRad(angle));
+        double totalViewSizeX = 2.0 * distance * Math.Tan(DegToRad(FOV.Theta) / 2.0);
+        double totalViewSizeY = 2.0 * distance * Math.Tan(DegToRad(FOV.Phi) / 2.0);
+
+        Dictionary<string, int> pixels = new Dictionary<string, int>();
+        pixels.Add("i", (int)Math.Round(totalViewSizeX / apparentSize));
+        pixels.Add("j", (int)Math.Round(totalViewSizeY / apparentSize));
+        return pixels;
     }
 }

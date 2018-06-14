@@ -9,12 +9,13 @@ The app renders a wireframe of visible meshes as well as a panel of process diag
 
 ### Building on Local Machine
 1. Import [Unity project assets](https://github.com/VUSE-Hololens/assets/tree/master/EFP%20Tester%20v1).
-2. Add following prefabs to project:
+2. Apply Mixed Reality Toolkit Project and Scene settings.
+3. Add following prefabs to project:
 	1. HoloToolkit/UX/Prefabs/3DTextPrefab
 	2. EFP
 	3. TextControlContainer
-3. Add cube GameObject to serve as text background (if desired).
-4. Within TextControlContainer/TextControl:
+4. Add cube GameObject to serve as text background (if desired).
+5. Within TextControlContainer/TextControl:
 	1. Set Text Container to 3DTextPrefab.
 	2. Set EFP Container to EFP.
-5. Build and deploy.
+6. Build and deploy.
