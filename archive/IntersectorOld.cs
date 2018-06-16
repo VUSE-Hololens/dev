@@ -1,14 +1,12 @@
-﻿/// Intersector
+﻿/// Archived in favor of more memory efficient version.
+
+/// Intersector
 /// Class for calculating resultant PointValues when 2D Raster is project along a Frustum at a Mesh.
 /// Content:
 /// PointValue (struct)
 /// ViewVector (struct)
 /// Frustum (struct)
 /// Intersector (class)
-
-/// NOTE: Tried to make Intersector:Intersection method generic so it was ambivalent to type of img. 
-/// This caused strange Unity build errors when accessing and mutating values within cells of ocGrid.
-/// Currently set to byte, if img data type changes will have to manually change code.
 
 using System;
 using System.Collections.Generic;
@@ -26,15 +24,6 @@ public struct PointValue<T>
     {
         Point = myPoint;
         Value = myValue;
-    }
-
-    /// <summary>
-    /// Same as constructor, except no new memory allocation.
-    /// </summary>
-    public void Update(Vector3 newPoint, T newValue)
-    {
-        Point = newPoint;
-        Value = newValue;
     }
 }
 
@@ -64,16 +53,6 @@ public struct ViewVector
         Theta = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanTheta(spatialVector.z, spatialVector.x));
         Phi = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanPhi(spatialVector.z, spatialVector.y));
     }
-
-    /// <summary>
-    /// Reassigns existing ViewVector to spatialVector.
-    /// Same as ViewVector ctor except no new memory allocation.
-    /// </summary>
-    public void Update(Vector3 spatialVector)
-    {
-        Theta = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanTheta(spatialVector.z, spatialVector.x));
-        Phi = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanPhi(spatialVector.z, spatialVector.y));
-    }
 }
 
 /// <summary>
@@ -82,10 +61,10 @@ public struct ViewVector
 /// </summary>
 public struct Frustum
 {
-    public Transform Transform;
+    public UnityEngine.Transform Transform { get; private set; }
     public ViewVector FOV { get; private set; }
 
-    public Frustum(Transform myTransform, ViewVector myFOV)
+    public Frustum(UnityEngine.Transform myTransform, ViewVector myFOV)
     {
         Transform = myTransform;
         FOV = myFOV;
@@ -117,54 +96,44 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     /// <summary>
     /// Metadata: how many vertices were in passed Frustum and non-occluded for last call to Intersection().
     /// </summary>
-    public int NonOccludedVertices { get; private set; }
-
-    /// pre-declarations of variables in Intersection() for memory efficiency
-    private int ImgPCi, ImgPCj, i, j, iOc, jOc, iImg, jImg;
-    private List<PointValue<byte>> Result = new List<PointValue<byte>>();
-    private Vector3 Pworld, Plocal;
-    private ViewVector Vlocal;
-
-
+    public int nonOccludedVertices { get; private set; }
 
     /// <summary>
     /// Calculates resultant PointValues when 2D Raster (img) is projected along Frustum at Mesh (vertices).
     /// Mesh represented by list of vertices.
     /// NOTE 1: does not currently account for occlusion.
     /// NOTE 2: projection's FOV should be full FOV angles, not half-angles.
-    /// NOTE 3: Attempted to make generic. See note at begining of file.
     /// </summary>
-    public List<PointValue<byte>> Intersection(Frustum projection, byte[,] img, List<Vector3> vertices)
+    public List<PointValue<T>> Intersection<T>(Frustum projection, T[,] img, List<Vector3> vertices)
     {
         /// setup
-        ImgPCi = img.GetLength(0);
-        ImgPCj = img.GetLength(1);
+        int imgPCi = img.GetLength(0);
+        int imgPCj = img.GetLength(1);
+        List<PointValue<T>> result = new List<PointValue<T>>();
         VerticesInView = 0;
 
-        /// update occlusion grid
-        /// Cannot predeclare OcPixels because cannot add Dictionary components in declaration.
-        Dictionary<string, int> OcPixels = RequiredGrid(projection.FOV);
-        // Predeclaration of ocGrid has no benefit due to array type an dynamic size.
-        OcclusionCell<byte>[,] ocGrid = new OcclusionCell<byte>[OcPixels["i"], OcPixels["j"]];
-        for (i = 0; i < OcPixels["i"]; i++)
+        /// create occlusion grid
+        Dictionary<string, int> ocPixels = RequiredGrid(projection.FOV);
+        int ocPCi = ocPixels["i"];
+        int ocPCj = ocPixels["j"];
+        OcclusionCell<T>[,] ocGrid = new OcclusionCell<T>[ocPCi, ocPCj];
+        for (int i = 0; i < ocGrid.GetLength(0); i++)
         {
-            for (j = 0; j < OcPixels["j"]; j++)
-            {
+            for (int j = 0; j < ocGrid.GetLength(1); j++)
                 ocGrid[i, j].nullCell = true;
-            }
         }
 
         /// try each vertex
-        for (i = 0; i < vertices.Count; i++)
+        foreach (Vector3 vertex in vertices)
         {
             /// calculate position vector (world space)
-            Vector(projection.Transform.position, vertices[i], ref Pworld);
+            Vector3 Pworld = Vector(projection.Transform.position, vertex);
 
             /// convert position vector (world space) to position vector (Frustum space)
-            Plocal = projection.Transform.InverseTransformVector(Pworld);
+            Vector3 Plocal = projection.Transform.InverseTransformVector(Pworld);
 
             /// convert position vector (Frustum space) to view vector (Frustum space)
-            Vlocal.Update(Plocal);
+            ViewVector Vlocal = new ViewVector(Plocal);
 
             /// check if view vector is within Frustum FOV
             if (Math.Abs(Vlocal.Theta) < projection.FOV.Theta / 2.0 &&
@@ -173,47 +142,42 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
                 VerticesInView++;
 
                 /// map view vector to occlusion grid
-                iOc = (int)(OcPixels["i"] / 2 + OcPixels["i"] * (Vlocal.Theta / projection.FOV.Theta));
-                jOc = (int)(OcPixels["j"] / 2 + OcPixels["j"] * (Vlocal.Phi / projection.FOV.Phi));
+                int ioc = (int)(ocPCi / 2 + ocPCi * (Vlocal.Theta / projection.FOV.Theta));
+                int joc = (int)(ocPCj / 2 + ocPCj * (Vlocal.Phi / projection.FOV.Phi));
 
                 /// add to occlusion grid as new PointValue if not occluded
-
-                if (ocGrid[iOc, jOc].nullCell || Pworld.magnitude < ocGrid[iOc, jOc].distance)
+                if (ocGrid[ioc, joc].nullCell || Pworld.magnitude < ocGrid[ioc, joc].distance)
                 {
                     /// map view vector to img pixel grid
-                    iImg = (int)(ImgPCi / 2 + ImgPCi * (Vlocal.Theta / projection.FOV.Theta));
-                    jImg = (int)(ImgPCj / 2 + ImgPCj * (Vlocal.Phi / projection.FOV.Phi));
+                    int iImg = (int)(imgPCi / 2 + imgPCi * (Vlocal.Theta / projection.FOV.Theta));
+                    int jImg = (int)(imgPCj / 2 + imgPCj * (Vlocal.Phi / projection.FOV.Phi));
 
                     /// update occlusion grid
-                    ocGrid[iOc, jOc].pv.Update(vertices[i], img[iImg, jImg]);
-                    ocGrid[iOc, jOc].distance = Pworld.magnitude;
-                    ocGrid[iOc, jOc].nullCell = false;
+                    ocGrid[ioc, joc].pv = new PointValue<T>(vertex, img[iImg, jImg]);
+                    ocGrid[ioc, joc].distance = Pworld.magnitude;
+                    ocGrid[ioc, joc].nullCell = false;
                 }
             }
         }
 
-        /// Alteratively could prevent reallocating using Result.Clear(), however is slow
-        Result = new List<PointValue<byte>>();
-        for (i = 0; i < ocGrid.GetLength(0); i++)
+        for (int i = 0; i < ocGrid.GetLength(0); i++)
         {
-            for (j = 0; j < ocGrid.GetLength(1); j++)
+            for (int j = 0; j < ocGrid.GetLength(1); j++)
             {
                 if (!ocGrid[i, j].nullCell)
-                    Result.Add(ocGrid[i, j].pv);
+                    result.Add(ocGrid[i, j].pv);
             }
         }
-        NonOccludedVertices = Result.Count;
-        return Result;
+        nonOccludedVertices = result.Count;
+        return result;
     }
-
 
     /// <summary>
     /// Returns vector FROM point1 TO point2.
-    /// NOTE: vec by reference, not return to prevent new allocation each time method is called.
     /// </summary>
-    public void Vector(Vector3 point1, Vector3 point2, ref Vector3 vec)
+    public Vector3 Vector(Vector3 point1, Vector3 point2)
     {
-        vec = point2 - point1;
+        return point2 - point1;
     }
 
     /// <summary>
@@ -278,8 +242,8 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
         double totalViewSizeY = 2.0 * distance * Math.Tan(DegToRad(FOV.Phi) / 2.0);
 
         Dictionary<string, int> pixels = new Dictionary<string, int>();
-        pixels["i"] = (int)Math.Round(totalViewSizeX / apparentSize);
-        pixels["j"] = (int)Math.Round(totalViewSizeY / apparentSize);
+        pixels.Add("i", (int)Math.Round(totalViewSizeX / apparentSize));
+        pixels.Add("j", (int)Math.Round(totalViewSizeY / apparentSize));
         return pixels;
     }
 }

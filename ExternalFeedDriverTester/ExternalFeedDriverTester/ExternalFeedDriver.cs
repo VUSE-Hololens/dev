@@ -1,59 +1,62 @@
-﻿/// ExternalFeedDriver
-/// Driver for Hololens based tests of External Feed pathway of Sensor Integrator Application.
+﻿/// Driver for EFP (External Feed Pathway)
 /// Mark Scherer, June 2018
 
-using System;
-using System.Linq;
-using System.Diagnostics;
+/// Currently owns dependencies as private variables. Not sure of best strategy. Could also:
+/// Require them as components.
+/// Have them as public variables of a separate GameObject.
+/// Implement them as static classes
+
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 
-/// <summary>
-/// Driver of External Feed pathway of Sensor Integrator Application.
-/// </summary>
 [RequireComponent(typeof(MeshManager))]
 [RequireComponent(typeof(VoxelGridManager))]
-public class ExternalFeedDriver : MonoBehaviour
+public class EFPDriver : MonoBehaviour
 {
-    /// <summary>
-    /// Tracks speed of execution of pathway.
-    /// </summary>
-    public double speed { get; private set; }
 
-    /// <summary>
-    /// Central control for VoxelGridManager.
-    /// </summary>
-    public bool updateVoxelStructure = true;
+    // metadata
+    public double DriverSpeed { get; private set; } // Update(), seconds
+    public double MeshManSpeed { get; private set; } // MeshManager:UpdateVertices(), seconds
+    public double VoxGridManSpeed { get; private set; } // VoxelGridManager:Set(), seconds
 
-    private Stopwatch stopWatch = new Stopwatch();
+    // dependencies
+    public MeshManager MeshMan { get; private set; }
+    public VoxelGridManager VoxGridMan { get; private set; }
 
-    /// <summary>
-    /// Called once at startup.
-    /// </summary>
+    // pre-declarations
+    private List<Vector3> Vertices = new List<Vector3>();
+    private Stopwatch StopWatch = new Stopwatch();
+    private Stopwatch SubStopWatch = new Stopwatch();
+
+    // Use this for initialization
     void Start()
     {
-        VoxelGridManager.Instance.updateStruct = updateVoxelStructure;
+        MeshMan = MeshManager.Instance;
+        VoxGridMan = VoxelGridManager.Instance;
     }
 
-    /// <summary>
-    /// Called once per frame.
-    /// </summary>
+    // Update is called once per frame
     void Update()
     {
-        stopWatch.Reset();
-        stopWatch.Start();
+        StopWatch.Reset();
+        StopWatch.Start();
 
-        /// get mesh vertex list from MeshManager
-        List<Vector3> vertices = MeshManager.Instance.getVertices();
+        // call MeshManager to update
+        SubStopWatch.Reset();
+        SubStopWatch.Start();
+        MeshMan.UpdateVertices(ref Vertices);
+        SubStopWatch.Stop();
+        MeshManSpeed = (double)SubStopWatch.ElapsedTicks / (double)Stopwatch.Frequency;
 
-        // create list of update values
-        byte defaultValue = 0;
-        List<byte> updateValues = Enumerable.Repeat(defaultValue, vertices.Count).ToList();
+        // update VoxelGrid
+        SubStopWatch.Reset();
+        SubStopWatch.Start();
+        VoxGridMan.Set(Vertices);
+        SubStopWatch.Stop();
+        VoxGridManSpeed = (double)SubStopWatch.ElapsedTicks / (double)Stopwatch.Frequency;
 
-        // push updates to VoxelGridManager
-        VoxelGridManager.Instance.set(vertices, updateValues);
-
-        stopWatch.Stop();
-        speed = (double)Stopwatch.Frequency / (double)stopWatch.ElapsedTicks;
+        StopWatch.Stop();
+        DriverSpeed = (double)StopWatch.ElapsedTicks / (double)Stopwatch.Frequency;
     }
 }

@@ -24,6 +24,6 @@ The application runs the following tests and displays their output:
 	4. VisualizerContainer
 	5. CoordinateSystems
 4. Within TextControlContainer/TextControl set:
-	1. TextContainer to Diagnostics
+	1. TextContainer to Diagnostics/DiagnosticsText
 	2. IntersectorContainer (field) to IntersectorContainer (prefab)
 5. Build and deploy.
