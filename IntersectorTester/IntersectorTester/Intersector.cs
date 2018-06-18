@@ -61,18 +61,8 @@ public struct ViewVector
     /// </summary>
     public ViewVector(Vector3 spatialVector)
     {
-        Theta = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanTheta(spatialVector.z, spatialVector.x));
-        Phi = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanPhi(spatialVector.z, spatialVector.y));
-    }
-
-    /// <summary>
-    /// Reassigns existing ViewVector to spatialVector.
-    /// Same as ViewVector ctor except no new memory allocation.
-    /// </summary>
-    public void Update(Vector3 spatialVector)
-    {
-        Theta = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanTheta(spatialVector.z, spatialVector.x));
-        Phi = Intersector.Instance.RadToDeg(Intersector.Instance.AdjAtanPhi(spatialVector.z, spatialVector.y));
+        Theta = Intersector.RadToDeg(Intersector.AdjAtanTheta(spatialVector.x, spatialVector.z));
+        Phi = Intersector.RadToDeg(Intersector.AdjAtanPhi(spatialVector));
     }
 }
 
@@ -102,6 +92,7 @@ public struct OcclusionCell<T>
     public bool nullCell;
 }
 
+
 /// <summary>
 /// Calculates resultant PointValues when 2D Raster is projected along a Frustum at a Mesh.
 /// Mesh represented by list of vertices.
@@ -119,14 +110,16 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     /// </summary>
     public int NonOccludedVertices { get; private set; }
 
+    public int InViewCount { get; private set; }
+    public int OutViewCount { get; private set; }
+
     /// pre-declarations of variables in Intersection() for memory efficiency
     private int ImgPCi, ImgPCj, i, j, iOc, jOc, iImg, jImg;
     private List<PointValue<byte>> Result = new List<PointValue<byte>>();
     private Vector3 Pworld, Plocal;
     private ViewVector Vlocal;
 
-
-
+    /* OLD INTERSECTION VERSION
     /// <summary>
     /// Calculates resultant PointValues when 2D Raster (img) is projected along Frustum at Mesh (vertices).
     /// Mesh represented by list of vertices.
@@ -205,26 +198,72 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
         NonOccludedVertices = Result.Count;
         return Result;
     }
+    */
+
+    // new Intersection
+    /// <summary>
+    /// Calculates resultant PointValues when 2D Raster (img) is projected along Frustum at Mesh (vertices).
+    /// Mesh represented by list of vertices.
+    /// NOTE 1: does not currently account for occlusion.
+    /// NOTE 2: projection's FOV should be full FOV angles, not half-angles.
+    /// NOTE 3: Attempted to make generic. See note at begining of file.
+    /// </summary>
+    public void Intersection(Frustum projection, List<Vector3> vertices,
+        out List<Vector3> InView, out List<Vector3> OutView, out List<ViewVector> VV, out List<Vector3> PVecs)
+    {
+        /// setup
+        VerticesInView = 0;
+        InView = new List<Vector3>();
+        OutView = new List<Vector3>();
+        VV = new List<ViewVector>();
+        PVecs = new List<Vector3>();
+
+        /// try each vertex
+        for (i = 0; i < vertices.Count; i++)
+        {
+            /// calculate position vector (world space)
+            Pworld = Vector(projection.Transform.position, vertices[i]);
+
+            /// convert position vector (world space) to position vector (Frustum space)
+            Plocal = projection.Transform.InverseTransformVector(Pworld);
+            PVecs.Add(Plocal);
+
+            /// convert position vector (Frustum space) to view vector (Frustum space)
+            ViewVector Vlocal = new ViewVector(Plocal);
+            VV.Add(Vlocal);
+
+            /// check if view vector is within Frustum FOV
+            if (Math.Abs(Vlocal.Theta) < projection.FOV.Theta / 2.0 &&
+                Math.Abs(Vlocal.Phi) < projection.FOV.Phi / 2.0)
+            {
+                VerticesInView++;
+                InView.Add(vertices[i]);
+            }
+            else
+                OutView.Add(vertices[i]);
+        }
+        InViewCount = InView.Count;
+        OutViewCount = OutView.Count;
+    }
 
 
     /// <summary>
     /// Returns vector FROM point1 TO point2.
-    /// NOTE: vec by reference, not return to prevent new allocation each time method is called.
     /// </summary>
-    public void Vector(Vector3 point1, Vector3 point2, ref Vector3 vec)
+    public Vector3 Vector(Vector3 point1, Vector3 point2)
     {
-        vec = point2 - point1;
+        return point2 - point1;
     }
 
     /// <summary>
     /// Converts radians to degrees.
     /// </summary>
-    public double RadToDeg(double rad)
+    public static double RadToDeg(double rad)
     {
         return rad * (180.0 / Math.PI);
     }
 
-    public double DegToRad(double deg)
+    public static double DegToRad(double deg)
     {
         return deg * (Math.PI / 180.0);
     }
@@ -232,36 +271,23 @@ public class Intersector : HoloToolkit.Unity.Singleton<Intersector>
     /// <summary>
     /// Calculates arctan (in radians) so that resultant angle is between -pi and pi.
     /// </summary>
-    public double AdjAtanTheta(double denominator, double numerator)
+    public static double AdjAtanTheta(double numerator, double denominator)
     {
-        if (numerator == 0)
-        {
-            if (denominator > 0)
-                return 0.0;
-            else
-                return 180.0;
-        }
-        if (denominator < 0 && numerator > 0) /// Q3
-            return Math.PI / 2.0 + Math.Atan(-denominator / numerator);
-        if (denominator < 0 && numerator < 0) /// Q4
-            return -Math.PI / 2.0 - Math.Atan(numerator / denominator);
-        return Math.Atan(denominator / numerator);
+        if (denominator < 0 && numerator < 0) /// Q3
+            return -Math.PI / 2.0 - Math.Atan(denominator / numerator);
+        if (numerator > 0 && denominator < 0) /// Q4
+            return Math.PI / 2.0 + Math.Atan(Math.Abs(denominator) / numerator);
+        return Math.Atan(numerator / denominator);
     }
 
     /// <summary>
     /// Calculates arctan (in radians) always in reference to plane of numerator.
     /// </summary>
-    public double AdjAtanPhi(double denominator, double numerator)
+    public static double AdjAtanPhi(Vector3 spatialVector)
     {
-        if (numerator == 0)
-        {
-            return 0;
-        }
-        if (denominator < 0 && numerator > 0) /// Q2
-            return Math.Atan(-denominator / numerator);
-        if (denominator < 0 && numerator < 0) /// Q3
-            return -Math.Atan(denominator / numerator);
-        return Math.Atan(denominator / numerator);
+        Vector3 proj = new Vector3(spatialVector.x, 0, spatialVector.z);
+        float mag = proj.magnitude;
+        return Math.Atan(spatialVector.y / mag);
     }
 
     /// <summary>
