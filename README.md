@@ -6,6 +6,7 @@ Repository for content developed for VADL Hololens initative.
 ### Apps
 * [External Feed Pathway Tester v2](../master/EFPv2.md): EFP with simulated sensor.
 * [External Feed Pathway Tester v1](../master/EFPv1.md): EFP without sensor or intersection calculation.
+* [ITv3](../master/ITv3.md): Tester for intersection calculations with occlusion.
 * [ITv2](../master/ITv2.md): Expanded dynamic tester for intersection calculations.
 * [ITv1](../master/IntersectorTester.md): Static tester for intersection calculations.
 

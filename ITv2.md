@@ -1,5 +1,5 @@
 # Intersector Tester v2
-Further tests Intersector Class
+Further tests on Intersector Class. Does not test occlusion.
 
 ### Changes Since v1
 * Dynamic tests: Intersection tests is more comprehensive, interactive and insightful
