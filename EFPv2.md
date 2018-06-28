@@ -8,16 +8,18 @@ The following changes were made since EFP Tester v1:
 
 ### Functionality
 Simulated data from a dummy external sensor positioned at the user's head is projected onto the mesh, with intersected vertices and their corresponding external feed values stored in a voxel grid. 
-Optionally intersected vertices can be rendered and colored according to their projected value. A diagnostic panel is also displayed.
+Optionally intersected vertices can be rendered and colored according to their projected value. A diagnostic panel can also be displayed. Bounding boxes can optionally be visualized around individual mesh objects.
 Eventually a real external sensor will be used and rendering will be done via the mesh texture itself.
 
 ![picture alt](../master/imgs/EFPTesterv2screenshot2.jpg "screenshot")
 
 The app is driven by the Unity GameObject EFP, which has the following components: EFPDriver, SpatialMappingObserver, SpatialMappingManager, and MeshManager.
-Each cycle EFPDriver calls MeshManager to update a list of mesh vertices, which it does by polling SpatialMappingObserver and compiling all vertices from meshes it estimates as visible using an Intersector object.
+Each cycle EFPDriver calls MeshManager to update which cached meshes in within the sensor's FOV, which it does using an Intersector object. Mesh caching is handled by SpatialMappingObserver.
 EFPDriver then uses its own Intersector object to determine which mesh vertices are actually visible and non-occluded, and then calculate their projected values from the simulated external sensor.
 Next EFPDriver maintains a voxel grid of those points and values using a VoxelGridManager object, which internally stores them in an Octree.
 Finally EFPDriver calls on a Visualizer object to render mesh vertices according to their project values. Optionally, MeshManager can also use its own Visualizer object to render bounding boxes around each individual mesh.
+
+The GameObject Menu drives the menu. It controls rendering options as well as occlusion resolution and mesh visibility sensitivity.
 
 The Unity GameObject Diagnostics drives the diagnostics panel. The DiagnosticsControl component polls various EFP components each cycle for metadata then displays them on the diagnostics panel.
 
