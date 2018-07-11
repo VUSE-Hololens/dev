@@ -4,6 +4,7 @@ Repository for content developed for VADL Hololens initative.
 **Note:** When editing source file projects, always retieve most recent version from its base source file as indicated by links below. As source files are edited, only base source file is kept up to date, not all versions within other projects.
 
 ### Apps
+* [Proximity Sensor](../master/ProximitySensor.md): Mesh colored according to proximity to user.
 * [Sensor Integrator Dev](../master/SIdev.md): Development platform for complete external sensor - Hololens integration with simulated external sensor.
 * [External Feed Pathway Tester v2](../master/EFPv2.md): EFP with simulated sensor.
 * [External Feed Pathway Tester v1](../master/EFPv1.md): EFP without sensor or intersection calculation.
