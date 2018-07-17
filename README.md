@@ -6,6 +6,7 @@ Repository for content developed for VADL Hololens initative.
 ### Apps
 * [Proximity Sensor](../master/ProximitySensor.md): Mesh colored according to proximity to user.
 * [Sensor Integrator Dev](../master/SIdev.md): Development platform for complete external sensor - Hololens integration with simulated external sensor.
+* [Sensor Update Dev](../master/SensorUpdateDev.md): Test app for external sensor data update methods.
 * [External Feed Pathway Tester v2](../master/EFPv2.md): EFP with simulated sensor.
 * [External Feed Pathway Tester v1](../master/EFPv1.md): EFP without sensor or intersection calculation.
 * [ITv3](../master/ITv3.md): Tester for intersection calculations with occlusion.
