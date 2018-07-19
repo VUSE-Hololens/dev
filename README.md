@@ -4,6 +4,7 @@ Repository for content developed for VADL Hololens initative.
 **Note:** When editing source file projects, always retieve most recent version from its base source file as indicated by links below. As source files are edited, only base source file is kept up to date, not all versions within other projects.
 
 ### Apps
+* [Arducam Dev](../master/ArducamDev.md): Arducam camera as proof of concept external sensor.
 * [Proximity Sensor](../master/ProximitySensor.md): Mesh colored according to proximity to user.
 * [Sensor Integrator Dev](../master/SIdev.md): Development platform for complete external sensor - Hololens integration with simulated external sensor.
 * [Sensor Update Dev](../master/SensorUpdateDev.md): Test app for external sensor data update methods.
